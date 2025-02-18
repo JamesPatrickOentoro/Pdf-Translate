@@ -1,6 +1,6 @@
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'gcr.io/$PROJECT_ID/pdf-translate-image', '.']
+  args: ['build', '-t', 'asia-southeast2-docker.pkg.dev/$PROJECT_ID/document-translate-patrick/pdf-translate-image', '.']
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   args:
   - 'gcloud' # Use 'gcloud' instead of 'run'
@@ -8,7 +8,7 @@ steps:
   - 'deploy'
   - 'pdf-translate-image'
   - '--image'
-  - 'gcr.io/$PROJECT_ID/pdf-translate-image'
+  - 'asia-southeast2-docker.pkg.dev/$PROJECT_ID/document-translate-patrick/pdf-translate-image'
   - '--region'
   - 'asia-southeast2'
   - '--platform'
