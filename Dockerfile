@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 7860
 # Set default command to run the application
-CMD ["python","run", "main.py", "--server.port", "7860"]
+CMD ["python", "main.py", "--server.port", "7860"]
