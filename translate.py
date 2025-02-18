@@ -28,7 +28,7 @@ def translate(model,generation_config,contents):
         ]
 
 
-    new_contents = []
+    # new_contents = []
     for i,content in enumerate(contents):
         time.sleep(2)
         # print(i, 'IIIIIII')
@@ -44,7 +44,7 @@ def translate(model,generation_config,contents):
         # print(responses,'RESPONSES')
         contents[i]['translated'] = responses.text
         # print(content,'CONTENT')
-        new_contents.append(content)
+        # new_contents.append(content)
     # print(len(contents),"LENNNNN")
         
         
