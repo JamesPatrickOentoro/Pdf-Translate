@@ -1,5 +1,5 @@
 # Use Python 3.10 (Compatible with PyTorch)
-FROM python:3.12
+FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 7860
 # Set default command to run the application
-CMD ["python", "main.py"]
+CMD ["python","run", "main.py", "--server.port", "7860"]
