@@ -1,10 +1,15 @@
-
-  steps:
+steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['login', '-u', '_json_key', '-p', '$$GOOGLE_APPLICATION_CREDENTIALS', 'asia-southeast2.gcr.io']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'asia-southeast2.gcr.io/$PROJECT_ID/pdf-translate-repo/pdf-translate:latest', '.']
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'asia-southeast2.gcr.io/$PROJECT_ID/pdf-translate-repo/pdf-translate:latest']
-images:
-- 'asia-southeast2.gcr.io/$PROJECT_ID/pdf-translate-repo/pdf-translate:latest'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/pdf-translate-image', '.']
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  args:
+  - 'run'
+  - 'deploy'
+  - 'pdf-translate-image'
+  - '--image'
+  - 'gcr.io/$PROJECT_ID/pdf-translate-image'
+  - '--region'
+  - 'asia-southeast2'
+  - '--platform'
+  - 'managed'
+  - '--allow-unauthenticated'
