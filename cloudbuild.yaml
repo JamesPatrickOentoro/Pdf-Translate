@@ -3,6 +3,7 @@ steps:
   args: ['build', '-t', 'gcr.io/$PROJECT_ID/pdf-translate-image', '.']
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   args:
+  - 'gcloud' # Use 'gcloud' instead of 'run'
   - 'run'
   - 'deploy'
   - 'pdf-translate-image'
