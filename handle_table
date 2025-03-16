@@ -1,0 +1,179 @@
+import pytesseract
+from PIL import Image
+import fitz
+import io
+import os
+from PIL import Image, ImageDraw, ImageFont
+from translate import *
+
+def find_table(compenents):
+    tables = []
+    other = []
+
+    # Iterate through the data and extract tables
+    for item in compenents:
+        if item['type'] == 'Table':
+            tables.append(item)
+        else:
+            other.append(item)
+    return other, tables
+
+
+def cut_tables_pdf(tables, pdf_file, offset_x=40, offset_y=100):  # Added offset parameters
+    tables_cut = []
+    doc = fitz.open(pdf_file, filetype="pdf")
+
+    for i, table in enumerate(tables):
+        loc = table['loc']
+        page_num = table['page']
+
+        try:
+            page = doc[page_num]
+            matrix = fitz.Matrix(3, 3)  # Increase resolution
+            pix = page.get_pixmap(matrix=matrix)
+            img_bytes = pix.tobytes("png")
+            img = Image.open(io.BytesIO(img_bytes))
+
+            # Apply offsets to the coordinates
+            left = loc.x_1 + offset_x - 50
+            upper = loc.y_1 + offset_y - 10
+            right = loc.x_2 + offset_x + 50
+            lower = loc.y_2 + offset_y + 60
+
+            cropped_img = img.crop((left, upper, right, lower))
+            output_file = os.path.join(f"table_{i}_page_{page_num}.png")
+            cropped_img.save(output_file, "PNG")
+            tables_cut.append(output_file)  # Store the file path of the cropped image
+
+            # Perform OCR on the cropped image and add it to the table entry
+            ocr_result = perform_ocr(output_file)
+            table['ocr_text'] = ocr_result  # Store the OCR result in the table
+
+        except Exception as e:
+            print(f"Error processing page {page_num}: {e}")
+
+    doc.close()
+    # print(tables_cut)
+    return tables_cut
+
+
+def perform_ocr(image_path):
+    """Performs OCR on an image and returns the extracted text."""
+    try:
+        # Open the image using PIL
+        img = Image.open(image_path)
+        
+        # Use Tesseract to extract text
+        ocr_text = pytesseract.image_to_string(img)
+
+        print(f"OCR Result for {image_path}:\n{ocr_text}")
+        return ocr_text
+    except Exception as e:
+        print(f"Error during OCR processing: {e}")
+        return ""
+
+
+# def replace_table_with_text(pdf_file):
+#     doc = fitz.open(pdf_file)
+#     for page in doc:
+#         tabs = page.find_tables()
+#         if tabs:
+#             for tab in tabs.tables:
+#                 try:
+#                     df = tab.to_pandas()
+#                     table_string = df.to_csv(index=False)
+#                     rect_tuple = tab.bbox #get bounding box tuple
+#                     rect = fitz.Rect(rect_tuple) #convert tuple to fitz.Rect
+
+#                     # 1. Delete the content within the table's rectangle
+#                     shape = page.new_shape()
+#                     shape.draw_rect(rect)
+#                     shape.finish(fill=(1, 1, 1))
+#                     shape.commit()
+
+#                     # 2. Insert the extracted text
+#                     page.insert_text(rect.tl, table_string, fontsize=8)
+
+#                 except Exception as e:
+#                     print(f"Error processing table: {e}")
+
+#     doc.save('coba_new.pdf')
+#     doc.close()
+
+
+def replace_table_with_image(pdf_file,save_name, output_image_dir="table_images"):
+    # if not os.path.exists(output_image_dir):
+    #     os.makedirs(output_image_dir)
+    print('MAASUK TRANSLATE TABLE')
+    doc = fitz.open(pdf_file)
+    for page_num, page in enumerate(doc):
+        tabs = page.find_tables()
+        if tabs:
+            for table_num, tab in enumerate(tabs.tables):
+                try:
+                    df = tab.to_pandas()
+                    # print(df) #print dataframe.
+                    rect = fitz.Rect(tab.bbox)
+
+                    print(f"Image dimensions: width={rect.width}, height={rect.height}") #print image dimensions
+                    print(f"rect: {rect}") # print rect values.
+                    for column in df.columns:
+                        df[column] = df[column].apply(translate_table)
+                    print(df)
+                    img = create_table_image(df, rect.width, rect.height)
+
+                    # image_filename = f"page_{page_num + 1}_table_{table_num + 1}.png"
+                    # image_path = os.path.join(output_image_dir, image_filename)
+                    # img.save(image_path)
+                    # try:
+                    #     Image.open(image_path).verify() #verify image.
+                    #     print(f"Image verification successful: {image_path}")
+                    # except Exception as e:
+                    #     print(f"Image verification failed: {image_path}, Error: {e}")
+
+                    img_bytes = io.BytesIO()
+                    img.save(img_bytes, format='PNG')
+                    img_bytes.seek(0)
+
+                    page.insert_image(rect, stream=img_bytes)
+
+                    #shape = page.new_shape() #comment this out to test without the white rectangle.
+                    #shape.draw_rect(rect)
+                    #shape.finish(fill=(1, 1, 1))
+                    #shape.commit()
+
+                except Exception as e:
+                    print(f"Error processing table: {e}")
+
+    doc.save(save_name)
+    doc.close()
+
+
+
+def create_table_image(df, width, height):
+    img = Image.new('RGB', (int(width), int(height)), color='white')
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("arial.ttf", 12)
+    except OSError:
+        font = ImageFont.load_default()
+
+    cell_width = width / len(df.columns)
+    cell_height = height / (len(df) + 1)
+
+    # Draw header
+    for i, col in enumerate(df.columns):
+        x0, y0 = i * cell_width, 0
+        x1, y1 = (i + 1) * cell_width, cell_height
+        draw.rectangle([x0, y0, x1, y1], outline='black')
+        draw.text((x0 + 5, y0 + 5), str(col), font=font, fill='black')
+
+    # Draw data rows
+    for row_idx, row in df.iterrows():
+        for col_idx, value in enumerate(row):
+            x0, y0 = col_idx * cell_width, (row_idx + 1) * cell_height
+            x1, y1 = (col_idx + 1) * cell_width, (row_idx + 2) * cell_height
+            draw.rectangle([x0, y0, x1, y1], outline='black')
+            draw.text((x0 + 5, y0 + 5), str(value), font=font, fill='black')
+
+    return img
