@@ -2,14 +2,17 @@ import pdf2image
 import numpy as np
 import layoutparser as lp
 import PIL.Image
-from PIL import ImageFont, ImageDraw # Import ImageDraw
+import os
+from translate import *
+from PIL import Image, ImageDraw
 # --- End of custom draw_box function ---
+from PIL import Image
 PIL.Image.LINEAR = PIL.Image.BILINEAR
 
 # ... (your code for loading the PDF and models) ...
 
-def bounding_box(pdf_file, model):
-    images  = pdf2image.convert_from_path(pdf_file.name)
+def bounding_box(pdf_file, model, translate_table, output_folder="segmented_images"):
+    images  = pdf2image.convert_from_path(pdf_file)
     print(len(images), 'LEMBARRR')
     page_text = []
     for i in range(len(images)):
@@ -27,7 +30,7 @@ def bounding_box(pdf_file, model):
         print("Layouts saved!")
 
         text_blocks = lp.Layout([
-            block for block in layout_result._blocks if block.type in ["Text", "Title", "List"]
+            block for block in layout_result._blocks if block.type in ["Text", "Title", "List","Table"]
         ])
         image_width = len(img[0])
 
@@ -45,17 +48,45 @@ def bounding_box(pdf_file, model):
         ocr_agent = lp.TesseractAgent(languages='eng')
 
         for block in text_blocks:
+            if block.type == 'Table':
+                if translate_table == 'True':
+                    segment_image = (block
+                                    .pad(left=15, right=15, top=5, bottom=5)
+                                    .crop_image(img))
 
-            # Crop image around the detected layout
-            segment_image = (block
-                            .pad(left=15, right=15, top=5, bottom=5)
-                            .crop_image(img))
-            
-            # Perform OCR
-            text = ocr_agent.detect(segment_image)
-            
-            # Save OCR result
-            block.set(text=text, inplace=True)
+                    # Add white background to the padded area
+                    segment_pil_image = Image.fromarray(segment_image)
+                    draw = ImageDraw.Draw(segment_pil_image)
+                    width, height = segment_pil_image.size
+                    draw.rectangle((0, 0, width, height), fill=(255, 255, 255)) # Fill with white
+
+                    #paste the cropped image onto the white background.
+                    cropped_pil_image = Image.fromarray(block.crop_image(img))
+                    left_pad = 15
+                    top_pad = 5
+                    segment_pil_image.paste(cropped_pil_image,(left_pad,top_pad))
+
+                    # Save cropped table img
+                    output_filename = f"page_{i}_block_{block.id}_{block.type}.png"
+                    output_path = os.path.join(output_folder, output_filename)
+                    segment_pil_image.save(output_path)
+                    print(f"Saved segment image: {output_path}")
+
+                    html = translate_table(segment_pil_image)
+                    print(html,'HTMLLL')
+                    block.set(text=html, inplace=True)
+                    print(block.text,'BLOCKKK')
+            else:
+                # Crop image around the detected layout
+                segment_image = (block
+                                .pad(left=15, right=15, top=5, bottom=5)
+                                .crop_image(img))
+                
+                # Perform OCR
+                text = ocr_agent.detect(segment_image)
+                
+                # Save OCR result
+                block.set(text=text, inplace=True)
 
         
         for txt in text_blocks:
@@ -66,8 +97,18 @@ def bounding_box(pdf_file, model):
                             "loc":txt.block,
                             'page':i,
                             'type':txt.type})
+        
             
     return page_text, img.shape
+
+
+
+
+
+
+
+
+
 
 
 
